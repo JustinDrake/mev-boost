@@ -21,6 +21,7 @@ import (
 	"github.com/attestantio/go-eth2-client/spec/bellatrix"
 	"github.com/attestantio/go-eth2-client/spec/capella"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/flashbots/go-boost-utils/types"
 	"github.com/flashbots/mev-boost/config"
 	"github.com/stretchr/testify/require"
@@ -99,6 +100,7 @@ func blindedBlockToExecutionPayloadBellatrix(signedBlindedBeaconBlock *types.Sig
 		ExtraData:     header.ExtraData,
 		BaseFeePerGas: header.BaseFeePerGas,
 		BlockHash:     header.BlockHash,
+		Transactions:  make([]hexutil.Bytes, 0),
 	}
 }
 
@@ -303,7 +305,7 @@ func TestGetHeader(t *testing.T) {
 			"0x8a1d7b8dd64e0aafe7ea7b6c95065c9364cf99d38470c12ee807d55f7de1529ad29ce2c422e0b65e3d5a05c02caca249",
 			consensusspec.DataVersionBellatrix,
 		)
-		resp.Bellatrix.Data.Message.Header.BlockHash = nilHash
+		resp.Bellatrix.Data.Message.Header.BlockHash = types.Hash(nilHash)
 
 		// 1/2 failing responses are okay
 		backend.relays[0].GetHeaderResponse = resp
@@ -742,10 +744,15 @@ func TestGetPayload(t *testing.T) {
 			ParentRoot:    types.Root{0x01},
 			StateRoot:     types.Root{0x02},
 			Body: &types.BlindedBeaconBlockBody{
-				RandaoReveal:  types.Signature{0xa1},
-				Eth1Data:      &types.Eth1Data{},
-				Graffiti:      types.Hash{0xa2},
-				SyncAggregate: &types.SyncAggregate{},
+				RandaoReveal:      types.Signature{0xa1},
+				Eth1Data:          &types.Eth1Data{},
+				Graffiti:          types.Hash{0xa2},
+				SyncAggregate:     &types.SyncAggregate{},
+				ProposerSlashings: make([]*types.ProposerSlashing, 0),
+				Attestations:      make([]*types.Attestation, 0),
+				AttesterSlashings: make([]*types.AttesterSlashing, 0),
+				Deposits:          make([]*types.Deposit, 0),
+				VoluntaryExits:    make([]*types.SignedVoluntaryExit, 0),
 				ExecutionPayloadHeader: &types.ExecutionPayloadHeader{
 					ParentHash:   _HexToHash("0xe28385e7bd68df656cd0042b74b69c3104b5356ed1f20eb69f1f925df47a3ab7"),
 					BlockHash:    _HexToHash("0x534809bd2b6832edff8d8ce4cb0e50068804fd1ef432c8362ad708a74fdc0e46"),
@@ -770,7 +777,9 @@ func TestGetPayload(t *testing.T) {
 
 	t.Run("Bad response from relays", func(t *testing.T) {
 		backend := newTestBackend(t, 2, time.Second)
-		resp := new(types.GetPayloadResponse)
+		resp := &types.GetPayloadResponse{
+			Version: "bellatrix",
+		}
 
 		// 1/2 failing responses are okay
 		backend.relays[0].GetBellatrixPayloadResponse = resp
@@ -895,8 +904,10 @@ func TestGetPayloadWithTestdata(t *testing.T) {
 
 			backend := newTestBackend(t, 1, time.Second)
 			mockResp := types.GetPayloadResponse{
+				Version: "bellatrix",
 				Data: &types.ExecutionPayload{
-					BlockHash: signedBlindedBeaconBlock.Message.Body.ExecutionPayloadHeader.BlockHash,
+					BlockHash:    signedBlindedBeaconBlock.Message.Body.ExecutionPayloadHeader.BlockHash,
+					Transactions: make([]hexutil.Bytes, 0),
 				},
 			}
 			backend.relays[0].GetBellatrixPayloadResponse = &mockResp
@@ -968,7 +979,8 @@ func TestGetPayloadToOriginRelayOnly(t *testing.T) {
 
 	// Prepare getPayload response
 	backend.relays[0].GetBellatrixPayloadResponse = &types.GetPayloadResponse{
-		Data: blindedBlockToExecutionPayloadBellatrix(signedBlindedBeaconBlock),
+		Version: "bellatrix",
+		Data:    blindedBlockToExecutionPayloadBellatrix(signedBlindedBeaconBlock),
 	}
 
 	// call getPayload, ensure it's only called on relay 0 (origin of the bid)

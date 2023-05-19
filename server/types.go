@@ -5,16 +5,25 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/attestantio/go-builder-client/api/capella"
+	apicapella "github.com/attestantio/go-builder-client/api/capella"
 	"github.com/attestantio/go-builder-client/spec"
+	"github.com/attestantio/go-eth2-client/api/v1/bellatrix"
+	"github.com/attestantio/go-eth2-client/api/v1/capella"
+	"github.com/attestantio/go-eth2-client/api/v1/deneb"
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/flashbots/go-boost-utils/types"
 )
 
-var errNoResponse = errors.New("no response")
+var (
+	errNoResponse = errors.New("no response")
+	errNilStruct  = errors.New("nil struct")
+	errNoData     = errors.New("no data")
+	errNoMessage  = errors.New("no message")
+	errNoBody     = errors.New("no body")
+	errNoHeader   = errors.New("no header")
+)
 
-// wrapper for backwards compatible capella types
-
+// wrapper different for types
 type GetHeaderResponse struct {
 	Bellatrix *types.GetHeaderResponse
 	Capella   *spec.VersionedSignedBuilderBid
@@ -55,11 +64,11 @@ func (r *GetHeaderResponse) MarshalJSON() ([]byte, error) {
 
 func (r *GetHeaderResponse) IsInvalid() bool {
 	if r.Bellatrix != nil {
-		return r.Bellatrix.Data == nil || r.Bellatrix.Data.Message == nil || r.Bellatrix.Data.Message.Header == nil || r.Bellatrix.Data.Message.Header.BlockHash == nilHash
+		return r.Bellatrix.Data == nil || r.Bellatrix.Data.Message == nil || r.Bellatrix.Data.Message.Header == nil || r.Bellatrix.Data.Message.Header.BlockHash == types.Hash(nilHash)
 	}
 
 	if r.Capella != nil {
-		return r.Capella.Capella == nil || r.Capella.Capella.Message == nil || r.Capella.Capella.Message.Header == nil || r.Capella.Capella.Message.Header.BlockHash == phase0.Hash32(nilHash)
+		return r.Capella.Capella == nil || r.Capella.Capella.Message == nil || r.Capella.Capella.Message.Header == nil || r.Capella.Capella.Message.Header.BlockHash == nilHash
 	}
 
 	return true
@@ -177,7 +186,7 @@ func (r *GetHeaderResponse) BuilderBid() *SignedBuilderBid {
 
 type SignedBuilderBid struct {
 	Bellatrix *types.SignedBuilderBid
-	Capella   *capella.SignedBuilderBid
+	Capella   *apicapella.SignedBuilderBid
 }
 
 func (r *SignedBuilderBid) UnmarshalJSON(data []byte) error {
@@ -189,7 +198,7 @@ func (r *SignedBuilderBid) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	var capella capella.SignedBuilderBid
+	var capella apicapella.SignedBuilderBid
 	err = json.Unmarshal(data, &capella)
 	if err != nil {
 		return err
@@ -209,4 +218,176 @@ func (r *SignedBuilderBid) MarshalJSON() ([]byte, error) {
 	}
 
 	return nil, errNoResponse
+}
+
+type SignedBlindedBeaconBlock struct {
+	Bellatrix *bellatrix.SignedBlindedBeaconBlock
+	Capella   *capella.SignedBlindedBeaconBlock
+	Deneb     *deneb.SignedBlindedBeaconBlock
+}
+
+func (s *SignedBlindedBeaconBlock) UnmarshalJSON(data []byte) error {
+	var err error
+	var bellatrix bellatrix.SignedBlindedBeaconBlock
+	err = json.Unmarshal(data, &bellatrix)
+	if err == nil {
+		s.Bellatrix = &bellatrix
+		return nil
+	}
+
+	var capella capella.SignedBlindedBeaconBlock
+	err = json.Unmarshal(data, &capella)
+	if err == nil {
+		s.Capella = &capella
+		return nil
+	}
+
+	var deneb deneb.SignedBlindedBeaconBlock
+	err = json.Unmarshal(data, &deneb)
+	if err != nil {
+		return err
+	}
+	s.Deneb = &deneb
+
+	return nil
+}
+
+func (s *SignedBlindedBeaconBlock) MarshalJSON() ([]byte, error) {
+	if s.Bellatrix != nil {
+		return json.Marshal(s.Bellatrix)
+	}
+
+	if s.Capella != nil {
+		return json.Marshal(s.Capella)
+	}
+
+	if s.Deneb != nil {
+		return json.Marshal(s.Deneb)
+	}
+
+	return nil, errNoResponse
+}
+
+func (s *SignedBlindedBeaconBlock) IsEmpty() bool {
+	if s.Bellatrix != nil {
+		return s.Bellatrix.Message == nil || s.Bellatrix.Message.Body == nil || s.Bellatrix.Message.Body.ExecutionPayloadHeader == nil
+	}
+	if s.Capella != nil {
+		return s.Capella.Message == nil || s.Capella.Message.Body == nil || s.Capella.Message.Body.ExecutionPayloadHeader == nil
+	}
+	if s.Deneb != nil {
+		return s.Deneb.Message == nil || s.Deneb.Message.Body == nil || s.Deneb.Message.Body.ExecutionPayloadHeader == nil
+	}
+	return true
+}
+
+func (s *SignedBlindedBeaconBlock) Slot() (phase0.Slot, error) {
+	if s == nil {
+		return 0, errNoData
+	}
+	if s.Bellatrix != nil {
+		if s.Bellatrix.Message == nil {
+			return 0, errNoMessage
+		}
+		return s.Bellatrix.Message.Slot, nil
+	}
+	if s.Capella != nil {
+		if s.Capella.Message == nil {
+			return 0, errNoMessage
+		}
+		return s.Capella.Message.Slot, nil
+	}
+	if s.Deneb != nil {
+		if s.Deneb.Message == nil {
+			return 0, errNoMessage
+		}
+		return s.Deneb.Message.Slot, nil
+	}
+	return 0, errNoData
+}
+
+func (s *SignedBlindedBeaconBlock) BlockHash() (phase0.Hash32, error) {
+	if s == nil {
+		return phase0.Hash32{}, errNoData
+	}
+	if s.Bellatrix != nil {
+		if s.Bellatrix.Message == nil {
+			return phase0.Hash32{}, errNoMessage
+		}
+		if s.Bellatrix.Message.Body == nil {
+			return phase0.Hash32{}, errNoBody
+		}
+		if s.Bellatrix.Message.Body.ExecutionPayloadHeader == nil {
+			return phase0.Hash32{}, errNoHeader
+		}
+		return s.Bellatrix.Message.Body.ExecutionPayloadHeader.BlockHash, nil
+	}
+	if s.Capella != nil {
+		if s.Capella.Message == nil {
+			return phase0.Hash32{}, errNoMessage
+		}
+		if s.Capella.Message.Body == nil {
+			return phase0.Hash32{}, errNoBody
+		}
+		if s.Capella.Message.Body.ExecutionPayloadHeader == nil {
+			return phase0.Hash32{}, errNoHeader
+		}
+		return s.Capella.Message.Body.ExecutionPayloadHeader.BlockHash, nil
+	}
+	if s.Deneb != nil {
+		if s.Deneb.Message == nil {
+			return phase0.Hash32{}, errNoMessage
+		}
+		if s.Deneb.Message.Body == nil {
+			return phase0.Hash32{}, errNoBody
+		}
+		if s.Deneb.Message.Body.ExecutionPayloadHeader == nil {
+			return phase0.Hash32{}, errNoHeader
+		}
+		return s.Deneb.Message.Body.ExecutionPayloadHeader.BlockHash, nil
+	}
+	return phase0.Hash32{}, errNoData
+}
+
+func (s *SignedBlindedBeaconBlock) ParentHash() (phase0.Hash32, error) {
+	if s == nil {
+		return phase0.Hash32{}, errNoData
+	}
+	if s.Bellatrix != nil {
+		if s.Bellatrix.Message == nil {
+			return phase0.Hash32{}, errNoMessage
+		}
+		if s.Bellatrix.Message.Body == nil {
+			return phase0.Hash32{}, errNoBody
+		}
+		if s.Bellatrix.Message.Body.ExecutionPayloadHeader == nil {
+			return phase0.Hash32{}, errNoHeader
+		}
+		return s.Bellatrix.Message.Body.ExecutionPayloadHeader.ParentHash, nil
+	}
+	if s.Capella != nil {
+		if s.Capella.Message == nil {
+			return phase0.Hash32{}, errNoMessage
+		}
+		if s.Capella.Message.Body == nil {
+			return phase0.Hash32{}, errNoBody
+		}
+		if s.Capella.Message.Body.ExecutionPayloadHeader == nil {
+			return phase0.Hash32{}, errNoHeader
+		}
+		return s.Capella.Message.Body.ExecutionPayloadHeader.ParentHash, nil
+	}
+	if s.Deneb != nil {
+		if s.Deneb.Message == nil {
+			return phase0.Hash32{}, errNoMessage
+		}
+		if s.Deneb.Message.Body == nil {
+			return phase0.Hash32{}, errNoBody
+		}
+		if s.Deneb.Message.Body.ExecutionPayloadHeader == nil {
+			return phase0.Hash32{}, errNoHeader
+		}
+		return s.Deneb.Message.Body.ExecutionPayloadHeader.ParentHash, nil
+	}
+	return phase0.Hash32{}, errNoData
 }

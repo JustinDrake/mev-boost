@@ -266,6 +266,7 @@ func (m *mockRelay) MakeGetPayloadResponse(parentHash, blockHash, feeRecipient s
 			BlockHash:    _HexToHash(blockHash),
 			BlockNumber:  blockNumber,
 			FeeRecipient: _HexToAddress(feeRecipient),
+			Transactions: make([]hexutil.Bytes, 0),
 		},
 	}
 }
