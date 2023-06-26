@@ -4,7 +4,7 @@ go 1.20
 
 require (
 	github.com/ethereum/go-ethereum v1.12.0
-	github.com/flashbots/go-boost-utils v1.6.0
+	github.com/flashbots/go-boost-utils v1.7.1-0.20230625230411-8c44018f4777
 	github.com/flashbots/go-utils v0.4.8
 	github.com/google/uuid v1.3.0
 	github.com/gorilla/mux v1.8.0
@@ -52,7 +52,7 @@ require (
 require (
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
-	github.com/attestantio/go-builder-client v0.3.1
+	github.com/attestantio/go-builder-client v0.3.2-0.20230623215408-1b5c4f7aaeaa
 	github.com/attestantio/go-eth2-client v0.17.0
 	github.com/btcsuite/btcd v0.22.0-beta // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
